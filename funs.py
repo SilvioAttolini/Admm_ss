@@ -76,7 +76,7 @@ def get_all_irs(data_folder, num_ula_mics, num_sma_mics, ir_length, selected_sou
 def translate_points_from_room_center_to_origin(room_dims, new_center, old_src_pos, old_mic_pos, old_walls_pos):
     old_center = np.array([room_dims[0]/2, room_dims[1]/2, 1])  # 1 is the z coord of the mics
 
-    # Calculate the translation vector
+    # translation vector
     translation_vector = new_center - old_center
 
     # Apply the translation to each point
@@ -87,6 +87,7 @@ def translate_points_from_room_center_to_origin(room_dims, new_center, old_src_p
     return moved_src_pos, moved_mic_pos, moved_walls_pos
 
 
+# select the mics to use based on the config chosen
 def build_pos_or_sig_mic(configuration, pos_or_sig_eval, num_ula_mics, num_sma_spheres, sphere_subdivisions):
     if configuration == 'a':
         mic_index_1 = 0
@@ -227,11 +228,7 @@ def plot_scene(pos_eval, pos_mic, pos_src, mics_to_plot, walls_pos, config, mon_
     ax_xy.scatter(pos_mic[:, 0], pos_mic[:, 1], marker='o', color='green', label="pos mic in")
     ax_xy.scatter(pos_mic_to_plot[:, 0], pos_mic_to_plot[:, 1], marker='*', color='black', label="plotted mics")
     ax_xy.scatter(pos_src[0], pos_src[1], marker='s', color='red', label="source pos")
-    # ax_xy.scatter(walls_pos[:, :, :, 0], walls_pos[:, :, :, 1], marker='x', color='black', label="walls")
     ax_xy.scatter(mon_pos[:, 0], mon_pos[:, 1], marker='.', color='orange', label="monopoles")
-    # ax_xy.scatter(pw_pos[:, 0], pw_pos[:, 1], marker='.', color='grey', label="plane waves")
-    # for i, p in enumerate(pw_pos):
-    #     plt.plot([center[0], p[0]], [center[1], p[1]], linestyle='-', color='black', alpha=0.2)
     ax_xy.set_xlabel('X-axis')
     ax_xy.set_ylabel('Y-axis')
     ax_xy.set_aspect('equal')
@@ -240,27 +237,6 @@ def plot_scene(pos_eval, pos_mic, pos_src, mics_to_plot, walls_pos, config, mon_
     plt.grid(True)
     ax_xy.set_title('mics')
     plt.show()
-
-    # Plot in 2D (YZ-plane)
-    # fig_yz = plt.figure()
-    # ax_yz = fig_yz.add_subplot(111)
-    # ax_yz.scatter(pos_eval[:, 1], pos_eval[:, 2], marker='.', color='cyan', label="pos eval")
-    # ax_yz.scatter(pos_mic[:, 1], pos_mic[:, 2], marker='o', color='green', label="pos mic in")
-    # ax_yz.scatter(pos_mic_to_plot[:, 1], pos_mic_to_plot[:, 2], marker='*', color='black', label="plotted mics")
-    # ax_yz.scatter(pos_src[1], pos_src[2], marker='s', color='red', label="source pos")
-    # ax_yz.scatter(walls_pos[:, :, :, 1], walls_pos[:, :, :, 2], marker='x', color='black', label="walls")
-    # ax_yz.scatter(mon_pos[:, 1], mon_pos[:, 2], marker='.', color='orange', label="monopoles")
-    # ax_yz.scatter(pw_pos[:, 1], pw_pos[:, 2], marker='.', color='grey', label="plane waves")
-    # for i, p in enumerate(pw_pos):
-    #     plt.plot([center[1], p[1]], [center[2], p[2]], linestyle='-', color='black', alpha=0.2)
-    # ax_yz.set_xlabel('Y-axis')
-    # ax_yz.set_ylabel('Z-axis')
-    # ax_yz.legend()
-    # ax_yz.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    # plt.grid(True)
-    # ax_yz.set_title('View from X-axis')
-    # plt.show()
-
 
 # ############################################################### #
 # ########### build input signals from given mic recs ########### #
@@ -298,15 +274,6 @@ def plot_time_and_freq_domains_of_a_rir(time, sig_in_time, freq_from_bins, sig_i
     plt.ylabel('Amplitude')
     plt.grid(True)
 
-    # freq plot in db
-    # plt.subplot(133)
-    # plt.semilogy(freq_from_bins, 2.0 / N * np.abs(sig_in_freq[0:N]))
-    # plt.title('Freq Domain of IR ' + str(ir_num))
-    # plt.xlabel('Frequency Hz')
-    # plt.ylabel('Amplitude')
-    # plt.xlim(0, 1300)
-    # plt.grid(True)
-
     plt.tight_layout()
     plt.show()
 
@@ -329,6 +296,7 @@ def plot_time_and_freq_domains_of_a_rir_version_2(time_ax, sig_in_time, time_stf
 
     plt.tight_layout()
     plt.show()
+
 
 # ######################################## #
 # ########## execute the method ########## #
@@ -362,10 +330,11 @@ def create_array_of_k_l(L, plane_waves_pos, center, speed_of_sound, freq):  # sw
 
     # the plane waves are parallel to the z axis
     pw_propagation_vector = np.zeros((L, 2))
+    # pw_propagation_vector = np.zeros(L)
     for i, angle in enumerate(vector_angles):
         # print(f"Point {i}: Angle = {angle:.2f} radians, cos: {(np.cos(angle)):.2f}, sin: {(np.sin(angle)):.2f}")
         pw_propagation_vector[i, :] = k_mag * np.array([np.cos(angle), np.sin(angle)])
-
+        # pw_propagation_vector[i] = k_mag * (np.cos(angle) + 1j * np.sin(angle))
     return pw_propagation_vector
 
 
@@ -381,18 +350,19 @@ def populate_plane_waves_dictionary(M, L, plane_waves_pos, mic_pos, center, spee
     dictionary_pw = np.zeros((M, L), dtype=complex)
     for i, m_pos in enumerate(pos_all_2d):
         for j, pw_k in enumerate(pw_propagation_vector):
+            # print(pw_k)
             dictionary_pw[i, j] = np.exp(1j * pw_k @ m_pos)
 
     return dictionary_pw
 
 
-def plot_overlaying_irs(ground, estimated, t, ir_number, samplerate, max_freq):
-
-    plt.plot(t, ground, label="ground")
-    plt.plot(t, estimated, alpha=0.7, linewidth=1, label="estimated")
-    plt.legend(loc='upper right')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.title("ground (filtered) vs estimated IR (" + str(ir_number) + ") \n "
-              "@ samplerate " + str(samplerate) + " Hz, max freq: " + str(max_freq) + "Hz")
-    plt.show()
+# def plot_overlaying_irs(ground, estimated, t, ir_number, samplerate, max_freq):
+#
+#     plt.plot(t, ground, label="ground")
+#     plt.plot(t, estimated, alpha=0.7, linewidth=1, label="estimated")
+#     plt.legend(loc='upper right')
+#     plt.xlabel('Time (s)')
+#     plt.ylabel('Amplitude')
+#     plt.title("ground (filtered) vs estimated IR (" + str(ir_number) + ") \n "
+#               "@ samplerate " + str(samplerate) + " Hz, max freq: " + str(max_freq) + "Hz")
+#     plt.show()

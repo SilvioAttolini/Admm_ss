@@ -31,7 +31,7 @@ def admm_ss(D, W, b, mu, max_iter):
     nd = 1.02 * np.max(np.linalg.eigvalsh(D.T @ D))
     nw = 1.02 * np.max(np.linalg.eigvalsh(W.T @ W))
 
-    # print(nd, nw)  # >> 0
+    # print(nd, nw)
 
     # Adaptive parameter rho
     rho_max = 10e10
@@ -40,13 +40,13 @@ def admm_ss(D, W, b, mu, max_iter):
     rho = M * eps2
 
     for k in range(1, max_iter + 1):
-        # print(rho)  # >> 0
+        # print(rho)
 
         x_old = x.copy()
         # Update x
         gx = x - rho / nd * D.T @ (theta + 1 / rho * (D @ x + W @ u - b))
         x = soft(gx, rho / nd)
-        #if np.linalg.norm(gx) > 1:
+        # if np.linalg.norm(gx) > 1:
             # print(np.linalg.norm(gx))
         # print(rho)
         x = x / 100  # contains amplitude escalation

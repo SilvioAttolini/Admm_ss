@@ -6,12 +6,12 @@ import scipy.fftpack as pyfft
 import matplotlib.pyplot as plt
 from scipy.signal import stft
 
+# ################################ #
+# ########### settings ########### #
+# ################################ #
+
 # Data folder
 data_folder = "3-9-23/"
-
-# ###################################### #
-# ########### scene settings ########### #
-# ###################################### #
 
 # scene settings
 num_ula_mics = 16
@@ -48,7 +48,7 @@ new_pos_src, new_pos_all, new_walls_pos = funs.translate_points_from_room_center
 
 # Microphone positions of all signals
 pos_eval = new_pos_all
-# Microphone positions of mics input
+# Microphone positions of mics input (only mics for analysis)
 pos_mic = funs.build_pos_or_sig_mic(configuration, pos_eval, num_ula_mics, num_sma_spheres, sphere_subdivisions)
 
 # ############################################ #
@@ -58,12 +58,12 @@ pos_mic = funs.build_pos_or_sig_mic(configuration, pos_eval, num_ula_mics, num_s
 # Region Omega: 1x1m around the source
 # with 13x13 grid points (aka origins of the monopoles)
 # each point is 0.077m from each other
-num_of_monopoles_per_row_column = 13
+num_of_monopoles_per_row_column = 13  # 5
 side_length_m = 1
 monopoles_positions = funs.setup_omega_region_monopole_pos(
     new_pos_src, num_of_monopoles_per_row_column, num_of_monopoles_per_row_column, side_length_m)
 
-# uniformly sampled plane waves from 0 to 2pi rad are used as W
+# W are uniformly sampled plane waves, with origin points from 0 to 2pi rad around the room
 radius = max(room_dims)/2 + 1
 num_of_pws = 127
 plane_waves_pos = funs.setup_plane_waves_pos(new_center, radius, num_of_pws)
@@ -80,7 +80,7 @@ N = (np.shape(monopoles_positions))[0]
 L = (np.shape(plane_waves_pos))[0]
 # T
 T = 1
-# M_new number of mics in synthesis
+# M_synth number of mics in synthesis
 M_synth = (np.shape(mics_to_plot))[0]
 
 # ##################################################################### #
@@ -95,7 +95,7 @@ funs.plot_scene(pos_eval, pos_mic, new_pos_src, mics_to_plot, new_walls_pos,
 # ########## build input signals from given mic recs ########### #
 # ############################################################## #
 
-# Down sampling of input signals
+# Down sampling of input signals (this should not be necessary)
 downSampling = 8  # 2
 ir_eval = signal.resample_poly(ir_all, up=1, down=downSampling, axis=-1)
 samplerate = samplerate_raw // downSampling
@@ -122,7 +122,8 @@ for ir_idx in range(M):
     stft_of_sigs_freq_dom[ir_idx, :] = freq_content_of_curr_mic
 
     # visualize the analysis signals
-    funs.plot_time_and_freq_domains_of_a_rir_version_2(t_plots, b_time_plot, time_stft, freqs_stft, Zxx, ir_idx, 'a')
+    funs.plot_time_and_freq_domains_of_a_rir_version_2(
+        t_plots, b_time_plot, time_stft, freqs_stft, Zxx, ir_idx, 'a')
 
 
 # ######################################## #
@@ -132,7 +133,7 @@ for ir_idx in range(M):
 mu = 0.6  # at page 7, near (36)
 MAX_ITER = 200
 
-# Initialize the matrix of built signals
+# Initialize the matrix of synth signals
 # Freq axis for the method
 k_bins = freqs_stft[1:]
 num_of_freqs = (np.shape(k_bins))[0]
@@ -170,17 +171,20 @@ for bin_num_idx, k_bin_value in enumerate(k_bins):
     dict_of_plane_waves_synthesis = funs.populate_plane_waves_dictionary(
                                 M_synth, L, plane_waves_pos, pos_mic_to_plot, new_center, speed_of_sound, k_bin_value)
     resulting_weights_freq_dom = (dict_of_greens_fun_synthesis @ x_res +
-                                  dict_of_plane_waves_synthesis @ u_res)  # resulting_weights_freq_dom is an M_new x T
+                                  dict_of_plane_waves_synthesis @ u_res)  # resulting_weights_freq_dom is an M_synth x T
 
+    # ### MATRIX OF SYNTH SIGNALS, BUILD COLUMN BY COLUMN(=FREQ) FOR ALL MICS ### #
     synthesized_sig_freq_dom[:, bin_num_idx] = resulting_weights_freq_dom.flatten()
 
     # if bin_num_idx == 30:
     #     break
 
+# overall active monopole
 monopoles_contribution = np.sum(np.abs(X), axis=1)
 active_monopole = np.argmax(monopoles_contribution)
 print("activ mon " + str(active_monopole))
 
+# visualize monopole activity
 plt.imshow(np.abs(X), cmap='viridis', interpolation='nearest', aspect='auto')
 cbar = plt.colorbar()
 cbar.set_label('active monopole per freq')
@@ -196,10 +200,10 @@ print("matrix of synthesized signals (time dom): " + str(np.shape(synthesized_si
 
 for ir_idx, actual_mic_id in enumerate(mics_to_plot):
     y_time_plot = np.real(synthesized_signals_at_new_mics[ir_idx, :])
-    # y_freq_plot = synthesized_sig_freq_dom[ir_idx, :]
     freqs_stft, time_stft, Zxx = stft(y_time_plot, samplerate, nperseg=256)
     funs.plot_time_and_freq_domains_of_a_rir_version_2(
         t_plots, y_time_plot, time_stft, freqs_stft, Zxx, ir_idx, 's')
+
 
 # todo: check which monopole is the active one
 # todo: anechoic
